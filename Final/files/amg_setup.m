@@ -16,12 +16,10 @@ function hierarchy = amg_setup(A, theta, max_levels, coarse_threshold)
 %   hierarchy{l}.A  : matrix at level l
 %   hierarchy{l}.P  : prolongation (empty at coarsest)
 %   hierarchy{l}.R  : restriction  (empty at coarsest)
-
     hierarchy    = {};
     hierarchy{1} = struct('A', A, 'P', [], 'R', []);
 
     for lev = 1 : max_levels - 1
-
         A_lev = hierarchy{lev}.A;
         n     = size(A_lev, 1);
 
@@ -39,6 +37,23 @@ function hierarchy = amg_setup(A, theta, max_levels, coarse_threshold)
 
         R        = P';
         A_coarse = R * A_lev * P;
+
+        % After: A_coarse = R * A_lev * P;
+        n_fine   = size(A_lev, 1);
+        n_coarse = size(A_coarse, 1);
+        ratio    = n_coarse / n_fine;
+        d        = diag(A_coarse);
+        rowsums  = sum(abs(A_coarse), 2) - abs(d);
+        dd_ratio = min(abs(d) ./ max(rowsums, 1e-14));  % <1 means NOT diag dominant
+        cond_est = condest(A_coarse);                    % condition number estimate
+        
+        fprintf('  Level %d -> %d:  coarsen=%.2f  min_dd=%.3f  condest=%.2e\n', ...
+                lev, lev+1, ratio, dd_ratio, cond_est);
+        
+        % Check interpolation weight range
+        P_vals = nonzeros(P);
+        fprintf('    P weights: min=%.3f  max=%.3f  n_negative=%d\n', ...
+        min(P_vals), max(P_vals), sum(P_vals < 0));
 
         hierarchy{lev}.P   = P;
         hierarchy{lev}.R   = R;
@@ -149,7 +164,7 @@ function [C_pts, F_pts] = cf_splitting(S, ST, n)
             if isempty(intersect(S{j}, C_i))
                 % H-1 violated: promote j to C
                 status(j) = 1;
-                C_i       = [C_i; j]; %#ok<AGROW>
+                C_i       = [C_i, j]; %#ok<AGROW>
             end
         end
     end

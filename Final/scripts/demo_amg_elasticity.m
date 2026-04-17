@@ -34,6 +34,7 @@ y_vec = linspace(h, 1-h, ny);
 % Contrast ratio ~ 3x in mu, which is enough to break homogeneous symmetry
 
 mu_bg  = 26;   lambda_bg  = 51;
+%mu_bg  = 77;   lambda_bg  = 115;
 mu_inc = 77;   lambda_inc = 115;
 
 % Circular inclusion centered at (0.5, 0.5) with radius 0.2
@@ -85,7 +86,7 @@ amg_opts.nu2              = 1;      % post-smoothing sweeps
 % GMRES options
 gmres_opts.tol      = 1e-8;    % relative residual tolerance
 gmres_opts.max_iter = 200;     % maximum iterations
-gmres_opts.restart  = 30;      % Krylov restart
+gmres_opts.restart  = 100;      % Krylov restart
 
 fprintf('--- AMG-Preconditioned GMRES ---\n');
 [x_amg, resvec_amg, iter_amg] = solve_with_amg_gmres(K, b, amg_opts, gmres_opts);
