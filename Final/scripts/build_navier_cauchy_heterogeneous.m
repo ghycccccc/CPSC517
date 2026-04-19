@@ -1,4 +1,4 @@
-function [K, b] = build_navier_cauchy_heterogeneous(nx, ny, h, lambda, mu, fx, fy)
+function [K, b] = build_navier_cauchy_heterogeneous(nx, ny, h, lambda, mu, fx, fy, opts)
 % BUILD_NAVIER_CAUCHY_HETEROGENEOUS  (corrected)
 %   Assembles K and b for 2D heterogeneous Navier-Cauchy via central FD.
 %
@@ -17,6 +17,9 @@ function [K, b] = build_navier_cauchy_heterogeneous(nx, ny, h, lambda, mu, fx, f
 %   lambda  - [ny x nx]  first Lame parameter
 %   mu      - [ny x nx]  shear modulus
 %   fx, fy  - [ny x nx]  body force components
+%   opts    - optional struct:
+%     .dof_ordering  'node' (default) : u1,v1,u2,v2,...,uN,vN
+%                    'component'             : u1,...,uN, v1,...,vN
 %
 % OUTPUT:
 %   K  - sparse [2*nx*ny x 2*nx*ny]
@@ -27,12 +30,26 @@ function [K, b] = build_navier_cauchy_heterogeneous(nx, ny, h, lambda, mu, fx, f
     assert(all(size(fx)     == [ny, nx]), 'fx must be [ny x nx]');
     assert(all(size(fy)     == [ny, nx]), 'fy must be [ny x nx]');
 
+    if nargin < 8, opts = struct(); end
+    if ~isfield(opts, 'dof_ordering'), opts.dof_ordering = 'node'; end
+
     N          = nx * ny;
     total_dofs = 2 * N;
 
     getNode = @(i, j) (j - 1) * nx + i;
-    getUdof = @(nd)    2 * nd - 1;
-    getVdof = @(nd)    2 * nd;
+    switch lower(opts.dof_ordering)
+        case 'node'
+            % Nodes packed together: u1,v1, u2,v2, ..., uN,vN
+            getUdof = @(nd) 2 * nd - 1;
+            getVdof = @(nd) 2 * nd;
+        case 'component'
+            % All u-DOFs first, then all v-DOFs: u1,...,uN, v1,...,vN
+            getUdof = @(nd) nd;
+            getVdof = @(nd) N + nd;
+        otherwise
+            error('build_navier_cauchy_heterogeneous: unknown dof_ordering "%s". ' ...
+                  + 'Use "node" or "component".', opts.dof_ordering);
+    end
 
     % ------------------------------------------------------------------
     % Material gradients  [ny x nx], central diff interior, one-sided BC

@@ -19,9 +19,14 @@ fprintf('=================================================\n\n');
 % -------------------------------------------------------------------------
 % 1. GRID AND MATERIAL SETUP
 % -------------------------------------------------------------------------
-nx = 30;          % grid points in x
-ny = 30;          % grid points in y
+nx = 64;          % grid points in x
+ny = 64;          % grid points in y
 h  = 1 / (nx+1); % grid spacing (unit domain)
+
+% DOF ordering — toggle to inspect the two matrix block structures:
+%   'node' : u1,v1,u2,v2,...,uN,vN   (node-by-node; tight bandwidth)
+%   'component'   : u1,...,uN, v1,...,vN     (all-u then all-v; 2x2 blocks)
+dof_opts.dof_ordering = 'component';
 
 % Coordinate arrays (node centers, Matlab convention: row=y, col=x)
 x_vec = linspace(h, 1-h, nx);
@@ -64,13 +69,50 @@ fy = -ones(ny, nx);    % downward force in y-direction
 fprintf('Assembling K and b...\n');
 t_assemble = tic;
 [K, b] = build_navier_cauchy_heterogeneous(nx, ny, h, ...
-                                            lambda_arr, mu_arr, fx, fy);
+                                            lambda_arr, mu_arr, fx, fy, dof_opts);
 t_assemble = toc(t_assemble);
 
 n_dofs = size(K, 1);
 fprintf('  System size:     %d x %d\n', n_dofs, n_dofs);
 fprintf('  Nonzeros in K:   %d\n', nnz(K));
 fprintf('  Assembly time:   %.3f seconds\n\n', t_assemble);
+
+% -------------------------------------------------------------------------
+% 2.5  DOF ORDERING COMPARISON  (5 x 5 demonstration grid)
+%      Assembles K under both conventions on a small homogeneous grid so
+%      the full sparsity pattern fits on screen.  The red dashed lines on
+%      the right panel mark the u-block / v-block boundary at DOF N+0.5.
+% -------------------------------------------------------------------------
+nx_s = 5;  ny_s = 5;  h_s = 1 / (nx_s + 1);
+lam_s = lambda_bg * ones(ny_s, nx_s);
+mu_s  = mu_bg     * ones(ny_s, nx_s);
+fx_s  = zeros(ny_s, nx_s);
+fy_s  = -ones(ny_s, nx_s);
+
+[K_int, ~] = build_navier_cauchy_heterogeneous(nx_s, ny_s, h_s, lam_s, mu_s, ...
+                 fx_s, fy_s, struct('dof_ordering', 'node'));
+[K_cmp, ~] = build_navier_cauchy_heterogeneous(nx_s, ny_s, h_s, lam_s, mu_s, ...
+                 fx_s, fy_s, struct('dof_ordering', 'component'));
+
+figure('Name', 'DOF Ordering Comparison', 'Position', [100 100 860 400]);
+
+subplot(1, 2, 1);
+spy(K_int);
+title('node  (u_1,v_1,\ldots,u_N,v_N)', 'Interpreter', 'tex');
+xlabel('DOF index');  ylabel('DOF index');
+
+subplot(1, 2, 2);
+spy(K_cmp);
+hold on;
+N_s = nx_s * ny_s;
+xline(N_s + 0.5, 'r--', 'LineWidth', 1.5);
+yline(N_s + 0.5, 'r--', 'LineWidth', 1.5);
+hold off;
+title('Component  (u_1,\ldots,u_N,\;v_1,\ldots,v_N)', 'Interpreter', 'tex');
+xlabel('DOF index');  ylabel('DOF index');
+
+fprintf('DOF ordering comparison shown for 5x5 grid (%d DOFs).\n', 2 * N_s);
+fprintf('Main solve below uses dof_ordering = ''%s''.\n\n', dof_opts.dof_ordering);
 
 % -------------------------------------------------------------------------
 % 3. SOLVE WITH AMG-PRECONDITIONED GMRES
@@ -164,9 +206,16 @@ colormap(gca, 'hot');
 u_vec = zeros(2*nx*ny, 1);
 v_vec = zeros(2*nx*ny, 1);
 
-getNode = @(i,j) (j-1)*nx + i;
-getUdof = @(n)   2*n - 1;
-getVdof = @(n)   2*n;
+getNode = @(i, j) (j - 1) * nx + i;
+N_nodes = nx * ny;
+switch lower(dof_opts.dof_ordering)
+    case 'node'
+        getUdof = @(nd) 2 * nd - 1;
+        getVdof = @(nd) 2 * nd;
+    case 'component'
+        getUdof = @(nd) nd;
+        getVdof = @(nd) N_nodes + nd;
+end
 
 U = zeros(ny, nx);
 V_disp = zeros(ny, nx);
