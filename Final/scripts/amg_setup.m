@@ -19,6 +19,9 @@ function hierarchy = amg_setup(A, theta, max_levels, coarse_threshold)
 
     hierarchy    = {};
     hierarchy{1} = struct('A', A, 'P', [], 'R', []);
+    [hierarchy{1}.M_fwd_fac, hierarchy{1}.M_bwd_fac, ...
+     hierarchy{1}.AmMfwd,    hierarchy{1}.AmMbwd] = ...
+        build_sweep_matrices(A, 1);
 
     for lev = 1 : max_levels - 1
 
@@ -43,6 +46,9 @@ function hierarchy = amg_setup(A, theta, max_levels, coarse_threshold)
         hierarchy{lev}.P   = P;
         hierarchy{lev}.R   = R;
         hierarchy{lev+1}   = struct('A', A_coarse, 'P', [], 'R', []);
+        [hierarchy{lev+1}.M_fwd_fac, hierarchy{lev+1}.M_bwd_fac, ...
+         hierarchy{lev+1}.AmMfwd,    hierarchy{lev+1}.AmMbwd] = ...
+            build_sweep_matrices(A_coarse, 1);
 
     end
 end
