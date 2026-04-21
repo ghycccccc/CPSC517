@@ -239,7 +239,7 @@ max_iter_total = gmres_max_iter * gmres_restart;   % total-iteration cap
 y_ceil = max(max(iters) * 1.20, 1);               % dynamic y headroom
 for m = 1:n_meth
     lbl = sprintf('%d', iters(m));
-    if flags(m) ~= 0, lbl = [lbl, '*']; end  %#ok<AGROW>
+    if flags(m) ~= 0, lbl = [lbl, '*']; end  
     % Place text just above bar; clamp so it stays inside axes
     text(m, min(iters(m) + y_ceil * 0.03, y_ceil * 0.96), lbl, ...
         'HorizontalAlignment', 'center', 'FontSize', 12, 'FontWeight', 'bold');
