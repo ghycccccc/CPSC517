@@ -23,6 +23,9 @@ function hierarchy = geomg_setup(A, grid_meta, max_levels, coarse_threshold)
 
     hierarchy = {};
     hierarchy{1} = struct('A', A, 'P', [], 'R', [], 'nx', nx, 'ny', ny);
+    [hierarchy{1}.M_fwd_fac, hierarchy{1}.M_bwd_fac, ...
+     hierarchy{1}.AmMfwd,    hierarchy{1}.AmMbwd] = ...
+        build_sweep_matrices(A, dof_per_node);
 
     for lev = 1:max_levels - 1
         A_lev = hierarchy{lev}.A;
@@ -58,6 +61,9 @@ function hierarchy = geomg_setup(A, grid_meta, max_levels, coarse_threshold)
         hierarchy{lev}.P = P;
         hierarchy{lev}.R = R;
         hierarchy{lev + 1} = struct('A', A_c, 'P', [], 'R', [], 'nx', nx_c, 'ny', ny_c);
+        [hierarchy{lev+1}.M_fwd_fac, hierarchy{lev+1}.M_bwd_fac, ...
+         hierarchy{lev+1}.AmMfwd,    hierarchy{lev+1}.AmMbwd] = ...
+            build_sweep_matrices(A_c, dof_per_node);
     end
 end
 
@@ -75,33 +81,33 @@ function P = build_interp_1d(nf, nc)
 
         if x <= xc(1)
             weight = x / xc(1);
-            rows = [rows; i]; %#ok<AGROW>
-            cols = [cols; 1]; %#ok<AGROW>
-            vals = [vals; weight]; %#ok<AGROW>
+            rows = [rows; i]; 
+            cols = [cols; 1]; 
+            vals = [vals; weight]; 
             continue;
         end
 
         if x >= xc(end)
             weight = (1 - x) / (1 - xc(end));
-            rows = [rows; i]; %#ok<AGROW>
-            cols = [cols; nc]; %#ok<AGROW>
-            vals = [vals; weight]; %#ok<AGROW>
+            rows = [rows; i]; 
+            cols = [cols; nc]; 
+            vals = [vals; weight]; 
             continue;
         end
 
         k = find(xc <= x, 1, 'last');
         if xc(k) == x
-            rows = [rows; i]; %#ok<AGROW>
-            cols = [cols; k]; %#ok<AGROW>
-            vals = [vals; 1]; %#ok<AGROW>
+            rows = [rows; i]; 
+            cols = [cols; k]; 
+            vals = [vals; 1]; 
         else
             xL = xc(k);
             xR = xc(k + 1);
             wL = (xR - x) / (xR - xL);
             wR = (x - xL) / (xR - xL);
-            rows = [rows; i; i]; %#ok<AGROW>
-            cols = [cols; k; k + 1]; %#ok<AGROW>
-            vals = [vals; wL; wR]; %#ok<AGROW>
+            rows = [rows; i; i]; 
+            cols = [cols; k; k + 1]; 
+            vals = [vals; wL; wR]; 
         end
     end
 

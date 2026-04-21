@@ -214,7 +214,7 @@ function [K, b] = build_navier_cauchy_heterogeneous(nx, ny, h, lambda, mu, fx, f
         for i = 1:nx
             if i==1||i==nx||j==1||j==ny
                 nd      = getNode(i,j);
-                bc_dofs = [bc_dofs, getUdof(nd), getVdof(nd)]; %#ok<AGROW>
+                bc_dofs = [bc_dofs, getUdof(nd), getVdof(nd)]; 
             end
         end
     end

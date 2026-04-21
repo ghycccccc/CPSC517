@@ -149,7 +149,7 @@ function [C_pts, F_pts] = cf_splitting(S, ST, n)
             if isempty(intersect(S{j}, C_i))
                 % H-1 violated: promote j to C
                 status(j) = 1;
-                C_i       = [C_i; j]; %#ok<AGROW>
+                C_i       = [C_i; j]; 
             end
         end
     end
@@ -183,9 +183,9 @@ function P = build_interpolation(A, C_pts, F_pts, S, n)
 
         if C_pts(i)
             % C-point: identity row
-            PI = [PI, i];                     %#ok<AGROW>
-            PJ = [PJ, coarse_indices(i)];     %#ok<AGROW>
-            PV = [PV, 1.0];                   %#ok<AGROW>
+            PI = [PI, i];                     
+            PJ = [PJ, coarse_indices(i)];     
+            PV = [PV, 1.0];                   
 
         else
             % F-point: compute AMG interpolation weights
@@ -206,9 +206,9 @@ function P = build_interpolation(A, C_pts, F_pts, S, n)
                 C_pts(i)          = true;
                 n_coarse          = n_coarse + 1;
                 coarse_indices(i) = n_coarse;
-                PI = [PI, i];                     %#ok<AGROW>
-                PJ = [PJ, coarse_indices(i)];     %#ok<AGROW>
-                PV = [PV, 1.0];                   %#ok<AGROW>
+                PI = [PI, i];                     
+                PJ = [PJ, coarse_indices(i)];     
+                PV = [PV, 1.0];                   
                 continue;
             end
 
@@ -220,9 +220,9 @@ function P = build_interpolation(A, C_pts, F_pts, S, n)
                 C_pts(i)          = true;
                 n_coarse          = n_coarse + 1;
                 coarse_indices(i) = n_coarse;
-                PI = [PI, i];                     %#ok<AGROW>
-                PJ = [PJ, coarse_indices(i)];     %#ok<AGROW>
-                PV = [PV, 1.0];                   %#ok<AGROW>
+                PI = [PI, i];                     
+                PJ = [PJ, coarse_indices(i)];     
+                PV = [PV, 1.0];                   
                 continue;
             end
 
@@ -240,9 +240,9 @@ function P = build_interpolation(A, C_pts, F_pts, S, n)
 
                 omega_ij = -num / denom;
 
-                PI = [PI, i];                   %#ok<AGROW>
-                PJ = [PJ, coarse_indices(j)];   %#ok<AGROW>
-                PV = [PV, omega_ij];            %#ok<AGROW>
+                PI = [PI, i];                   
+                PJ = [PJ, coarse_indices(j)];   
+                PV = [PV, omega_ij];            
             end
 
         end

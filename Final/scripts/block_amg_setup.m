@@ -42,6 +42,9 @@ function hierarchy = block_amg_setup(K, theta, max_levels, coarse_threshold)
 
     hierarchy    = {};
     hierarchy{1} = struct('A', K, 'P', [], 'R', []);
+    [hierarchy{1}.M_fwd_fac, hierarchy{1}.M_bwd_fac, ...
+     hierarchy{1}.AmMfwd,    hierarchy{1}.AmMbwd] = ...
+        build_sweep_matrices(K, 2);
 
     for lev = 1 : max_levels - 1
 
@@ -83,6 +86,9 @@ function hierarchy = block_amg_setup(K, theta, max_levels, coarse_threshold)
         hierarchy{lev}.P   = P;
         hierarchy{lev}.R   = R;
         hierarchy{lev+1}   = struct('A', A_coarse, 'P', [], 'R', []);
+        [hierarchy{lev+1}.M_fwd_fac, hierarchy{lev+1}.M_bwd_fac, ...
+         hierarchy{lev+1}.AmMfwd,    hierarchy{lev+1}.AmMbwd] = ...
+            build_sweep_matrices(A_coarse, 2);
 
     end
 end
@@ -189,7 +195,7 @@ function [C_pts, F_pts] = cf_splitting(S, ST, n)
             if status(j) == 1, continue; end
             if isempty(intersect(S{j}, C_i))
                 status(j) = 1;
-                C_i = [C_i; j]; %#ok<AGROW>
+                C_i = [C_i; j]; 
             end
         end
     end

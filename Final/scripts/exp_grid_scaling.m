@@ -188,7 +188,7 @@ fprintf('  Contrast %.0f×,  tol = %.0e\n', contrast, gmres_opts.tol);
 fprintf('=======================================================================\n');
 header = sprintf('%-22s', 'Method');
 for g = 1:n_grids
-    header = [header, sprintf(' %8s', sprintf('%dx%d', grid_sizes(g), grid_sizes(g)))]; %#ok<AGROW>
+    header = [header, sprintf(' %8s', sprintf('%dx%d', grid_sizes(g), grid_sizes(g)))]; 
 end
 fprintf('%s\n', header);
 fprintf('%s\n', repmat('-', 1, 22 + 9*n_grids));
@@ -197,7 +197,7 @@ for m = 1:n_methods
     for g = 1:n_grids
         flag_str = '';
         if all_flags(m, g) ~= 0, flag_str = '*'; end
-        row = [row, sprintf(' %7d%s ', all_iters(m, g), flag_str)]; %#ok<AGROW>
+        row = [row, sprintf(' %7d%s ', all_iters(m, g), flag_str)]; 
     end
     fprintf('%s\n', row);
 end
@@ -212,7 +212,7 @@ for m = 1:n_methods
     row = sprintf('%-22s', pc_opts.methods{m});
     for g = 1:n_grids
         t_tot = all_setup_time(m, g) + all_solve_time(m, g);
-        row = [row, sprintf(' %9.2f', t_tot)]; %#ok<AGROW>
+        row = [row, sprintf(' %9.2f', t_tot)]; 
     end
     fprintf('%s\n', row);
 end
