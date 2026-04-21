@@ -1,5 +1,4 @@
-
-
+[Scaling]
 =======================================================================
   SCALING SUMMARY — Iterations  (* = did not converge)
   Contrast 3×,  tol = 1e-08
@@ -27,6 +26,8 @@ geomg                       0.01      0.02      0.11      0.57
 block-amg                   0.12      0.36      1.92     14.33
 =======================================================================
 
+
+[Contrast]
 =======================================================================
   SWEEP SUMMARY — Iterations  (* = did not converge)
   Grid 64×64,  tol = 1e-06
@@ -53,3 +54,13 @@ block-jacobi              0.43    0.45    0.44    0.44    0.49
 geomg                     0.09    0.09    0.10    0.13    0.25
 block-amg                 1.45    1.60    1.61    1.73  125.01
 =======================================================================
+
+[Ablation]
+Method                                 Iters    TrueResid   Setup(s)   Solve(s)
+----------------------------------------------------------------------
+ 
+M1: Scalar AMG + scalar GS               30*     2.89e+02      6.928      6.435
+M2: Block AMG RS + block GS             100*     1.48e-05      4.614      0.627
+M3: Block AMG prop+SA + scalar GS         9     5.73e-07      1.546      0.084
+M4: Block AMG prop+SA + block GS          9     5.78e-07      1.546      0.108
+  (* = did not reach tolerance within max_iter)

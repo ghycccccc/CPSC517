@@ -6,24 +6,28 @@
 %  Isolates the contribution of two independent AMG design decisions on the
 %  2D heterogeneous Navier-Cauchy problem:
 %
-%    Axis 1 — Coarsening + prolongation  (M1 vs M2):
-%      Scalar AMG: per-DOF CF split, classical RS interpolation weights.
-%      Block AMG:  node-level CF split, proportional weights + SA smoothing.
-%      Changing from M1 to M2 tests whether keeping u-v pairs together
-%      during coarsening improves the coarse-space representation.
+%    Axis 1 — Prolongation strategy  (M1 vs M2 vs M3/M4):
+%      Scalar AMG:     per-DOF CF split, classical RS scalar interpolation.
+%      Block AMG RS:   node-level CF split, RS block weights (2×2 ω_ij matrices),
+%                      no SA smoothing.  Satisfies AMG interpolation property
+%                      directly via local equilibrium equation in block form.
+%      Block AMG prop: node-level CF split, proportional Frobenius-norm weights
+%                      + SA-style Jacobi prolongation smoothing.
+%      M1→M2 tests node-level coarsening + RS block weights vs scalar AMG.
+%      M2→M3 tests RS block weights vs proportional+SA (same block hierarchy).
 %
-%    Axis 2 — Smoother  (M2 vs M3, identical hierarchy):
+%    Axis 2 — Smoother  (M3 vs M4, identical proportional+SA hierarchy):
 %      Scalar GS: standard tril/triu sweep; treats all DOFs independently.
-%      Block GS:  2x2 block tril/triu sweep; updates (u_i, v_i) jointly.
-%      Changing from M2 to M3 tests whether the smoother's ability to
-%      capture within-node coupling matters beyond what the coarse space does.
+%      Block GS:  2×2 block tril/triu sweep; updates (u_i, v_i) jointly.
 %
 %  Methods:
-%    M1 — Scalar AMG  + scalar GS     (amg_setup  + amg_preconditioner)
-%    M2 — Block AMG   + scalar GS     (block_amg_setup + vcycle 'scalar')
-%    M3 — Block AMG   + block  GS     (block_amg_setup + vcycle 'block')
+%    M1 — Scalar AMG  + scalar GS     (amg_setup        + amg_preconditioner)
+%    M2 — Block AMG RS + block GS     (block_amg_setup_rs + vcycle 'block')
+%    M3 — Block AMG prop+SA + scalar GS  (block_amg_setup  + vcycle 'scalar')
+%    M4 — Block AMG prop+SA + block  GS  (block_amg_setup  + vcycle 'block')
 %
-%  M2 and M3 share an identical hierarchy; only the smoother differs.
+%  M3 and M4 share an identical hierarchy; only the smoother differs.
+%  M2 uses a separate RS hierarchy (block_amg_setup_rs).
 %
 %  Problem:
 %    nx×ny uniform grid (set below; default 64×64), h = 1/(nx+1).
@@ -92,8 +96,9 @@ gmres_restart  = 10;
 
 % -------------------------------------------------------------------------
 % 3. Build hierarchies
-%    Scalar AMG  -> used by M1
-%    Block AMG   -> shared by M2 and M3 (identical hierarchy, smoother differs)
+%    Scalar AMG      -> M1
+%    Block AMG RS    -> M2  (RS block weights, no SA smoothing)
+%    Block AMG prop  -> M3/M4 (proportional weights + SA; same hierarchy, smoother differs)
 % -------------------------------------------------------------------------
 fprintf('Building scalar AMG hierarchy (M1)...\n');
 t0 = tic;
@@ -102,7 +107,14 @@ t_setup_scalar = toc(t0);
 fprintf('  Levels: %d,  OC: %.2f×,  GC: %.2f×,  time: %.3f s\n\n', ...
     length(h_scalar), hier_oc(h_scalar), hier_gc(h_scalar), t_setup_scalar);
 
-fprintf('Building block AMG hierarchy (shared M2/M3)...\n');
+fprintf('Building block AMG RS hierarchy (M2)...\n');
+t0 = tic;
+h_block_rs = block_amg_setup_rs(K, theta, max_levels, coarse_threshold);
+t_setup_rs = toc(t0);
+fprintf('  Levels: %d,  OC: %.2f×,  GC: %.2f×,  time: %.3f s\n\n', ...
+    length(h_block_rs), hier_oc(h_block_rs), hier_gc(h_block_rs), t_setup_rs);
+
+fprintf('Building block AMG prop+SA hierarchy (shared M3/M4)...\n');
 t0 = tic;
 h_block = block_amg_setup(K, theta, max_levels, coarse_threshold);
 t_setup_block = toc(t0);
@@ -114,28 +126,36 @@ fprintf('  Levels: %d,  OC: %.2f×,  GC: %.2f×,  time: %.3f s\n\n', ...
 %    Each entry: label, short label, preconditioner handle, setup time, style
 % -------------------------------------------------------------------------
 cfg(1).label      = 'M1: Scalar AMG + scalar GS';
-cfg(1).short      = 'sAMG (sGS)';
+cfg(1).short      = 'sAMG(sGS)';
 cfg(1).apply      = @(r) amg_preconditioner(h_scalar, r, nu1, nu2);
 cfg(1).setup_time = t_setup_scalar;
 cfg(1).clr        = [0.00, 0.25, 0.90];   % blue
 cfg(1).lspec      = '-';
 cfg(1).lw         = 2.2;
 
-cfg(2).label      = 'M2: Block AMG + scalar GS';
-cfg(2).short      = 'bAMG(sGS)';
-cfg(2).apply      = @(r) block_amg_vcycle(h_block, 1, r, zeros(n_dofs,1), nu1, nu2, 'scalar');
-cfg(2).setup_time = t_setup_block;
-cfg(2).clr        = [0.85, 0.45, 0.10];   % orange
+cfg(2).label      = 'M2: Block AMG RS + block GS';
+cfg(2).short      = 'bAMG-RS(bGS)';
+cfg(2).apply      = @(r) block_amg_vcycle(h_block_rs, 1, r, zeros(n_dofs,1), nu1, nu2, 'block');
+cfg(2).setup_time = t_setup_rs;
+cfg(2).clr        = [0.75, 0.10, 0.15];   % crimson
 cfg(2).lspec      = '-';
 cfg(2).lw         = 2.2;
 
-cfg(3).label      = 'M3: Block AMG + block GS';
-cfg(3).short      = 'bAMG(bGS)';
-cfg(3).apply      = @(r) block_amg_vcycle(h_block, 1, r, zeros(n_dofs,1), nu1, nu2, 'block');
+cfg(3).label      = 'M3: Block AMG prop+SA + scalar GS';
+cfg(3).short      = 'bAMG(sGS)';
+cfg(3).apply      = @(r) block_amg_vcycle(h_block, 1, r, zeros(n_dofs,1), nu1, nu2, 'scalar');
 cfg(3).setup_time = t_setup_block;
-cfg(3).clr        = [0.00, 0.65, 0.60];   % teal
-cfg(3).lspec      = '--';
-cfg(3).lw         = 1.8;
+cfg(3).clr        = [0.85, 0.45, 0.10];   % orange
+cfg(3).lspec      = '-';
+cfg(3).lw         = 2.2;
+
+cfg(4).label      = 'M4: Block AMG prop+SA + block GS';
+cfg(4).short      = 'bAMG(bGS)';
+cfg(4).apply      = @(r) block_amg_vcycle(h_block, 1, r, zeros(n_dofs,1), nu1, nu2, 'block');
+cfg(4).setup_time = t_setup_block;
+cfg(4).clr        = [0.00, 0.65, 0.60];   % teal
+cfg(4).lspec      = '--';
+cfg(4).lw         = 1.8;
 
 
 
@@ -259,7 +279,7 @@ end
 
 set(gca, 'XTick', 1:n_meth, 'XTickLabel', {cfg.short}, 'FontSize', 10);
 ylabel('Time (s)', 'FontSize', 12);
-title(sprintf('AMG Ablation — Setup + Solve Time\n(%d×%d, contrast ~%.0f×;  M2/M3 share setup)', ...
+title(sprintf('AMG Ablation — Setup + Solve Time\n(%d×%d, contrast ~%.0f×;  M3/M4 share setup)', ...
               nx, ny, contrast), 'FontSize', 11);
 legend(bh, {'Setup', 'Solve'}, 'Location', 'northwest', 'FontSize', 10);
 grid on;
@@ -272,32 +292,41 @@ save_fig(fig3, fig_dir, 'amg_ablation_timing');
 fig4 = figure('Name', 'AMG Ablation: Hierarchy Complexity', ...
               'Position', [780 560 880 400]);
 
-clr_s = [0.00, 0.25, 0.90];   % blue  — scalar AMG
-clr_b = [0.00, 0.65, 0.60];   % teal  — block AMG
+clr_s  = [0.00, 0.25, 0.90];   % blue    — scalar AMG  (M1)
+clr_rs = [0.75, 0.10, 0.15];   % crimson — block AMG RS (M2)
+clr_b  = [0.00, 0.65, 0.60];   % teal    — block AMG prop+SA (M3/M4)
 
-L_s = length(h_scalar);
-L_b = length(h_block);
+L_s  = length(h_scalar);
+L_rs = length(h_block_rs);
+L_b  = length(h_block);
 
-s_nnz  = arrayfun(@(l) nnz(h_scalar{l}.A),      1:L_s);
-s_dofs = arrayfun(@(l) size(h_scalar{l}.A, 1),   1:L_s);
-b_nnz  = arrayfun(@(l) nnz(h_block{l}.A),        1:L_b);
-b_dofs = arrayfun(@(l) size(h_block{l}.A, 1),    1:L_b);
+s_nnz   = arrayfun(@(l) nnz(h_scalar{l}.A),    1:L_s);
+s_dofs  = arrayfun(@(l) size(h_scalar{l}.A,1),  1:L_s);
+rs_nnz  = arrayfun(@(l) nnz(h_block_rs{l}.A),  1:L_rs);
+rs_dofs = arrayfun(@(l) size(h_block_rs{l}.A,1),1:L_rs);
+b_nnz   = arrayfun(@(l) nnz(h_block{l}.A),     1:L_b);
+b_dofs  = arrayfun(@(l) size(h_block{l}.A,1),   1:L_b);
 
-oc_s = sum(s_nnz)  / s_nnz(1);    gc_s = sum(s_dofs) / s_dofs(1);
-oc_b = sum(b_nnz)  / b_nnz(1);    gc_b = sum(b_dofs) / b_dofs(1);
-L_max = max(L_s, L_b);
+oc_s  = sum(s_nnz)  / s_nnz(1);    gc_s  = sum(s_dofs)  / s_dofs(1);
+oc_rs = sum(rs_nnz) / rs_nnz(1);   gc_rs = sum(rs_dofs) / rs_dofs(1);
+oc_b  = sum(b_nnz)  / b_nnz(1);    gc_b  = sum(b_dofs)  / b_dofs(1);
+L_max = max([L_s, L_rs, L_b]);
 
 % Left panel: nnz per level
 subplot(1, 2, 1);
 hold on;
-semilogy(1:L_s, s_nnz, '-o', 'Color', clr_s, 'LineWidth', 1.8, ...
+semilogy(1:L_s,  s_nnz,  '-o', 'Color', clr_s,  'LineWidth', 1.8, ...
     'MarkerSize', 7, 'MarkerFaceColor', clr_s, ...
-    'DisplayName', sprintf('Scalar AMG  (OC=%.2f×)', oc_s));
-semilogy(1:L_b, b_nnz, '-s', 'Color', clr_b, 'LineWidth', 1.8, ...
+    'DisplayName', sprintf('M1 Scalar AMG   (OC=%.2f×)', oc_s));
+semilogy(1:L_rs, rs_nnz, '-^', 'Color', clr_rs, 'LineWidth', 1.8, ...
+    'MarkerSize', 7, 'MarkerFaceColor', clr_rs, ...
+    'DisplayName', sprintf('M2 Block AMG RS  (OC=%.2f×)', oc_rs));
+semilogy(1:L_b,  b_nnz,  '-s', 'Color', clr_b,  'LineWidth', 1.8, ...
     'MarkerSize', 7, 'MarkerFaceColor', clr_b, ...
-    'DisplayName', sprintf('Block AMG   (OC=%.2f×)', oc_b));
-annotate_pts(1:L_s, s_nnz, clr_s, 'above');
-annotate_pts(1:L_b, b_nnz, clr_b, 'below');
+    'DisplayName', sprintf('M3/M4 Block AMG  (OC=%.2f×)', oc_b));
+annotate_pts(1:L_s,  s_nnz,  clr_s,  'above');
+annotate_pts(1:L_rs, rs_nnz, clr_rs, 'below');
+annotate_pts(1:L_b,  b_nnz,  clr_b,  'above');
 set(gca, 'YScale', 'log');
 xlabel('Level');  ylabel('nnz(A_l)');
 title('nnz per hierarchy level', 'FontSize', 10);
@@ -308,14 +337,18 @@ grid on;
 % Right panel: DOF count per level
 subplot(1, 2, 2);
 hold on;
-semilogy(1:L_s, s_dofs, '-o', 'Color', clr_s, 'LineWidth', 1.8, ...
+semilogy(1:L_s,  s_dofs,  '-o', 'Color', clr_s,  'LineWidth', 1.8, ...
     'MarkerSize', 7, 'MarkerFaceColor', clr_s, ...
-    'DisplayName', sprintf('Scalar AMG  (GC=%.2f×)', gc_s));
-semilogy(1:L_b, b_dofs, '-s', 'Color', clr_b, 'LineWidth', 1.8, ...
+    'DisplayName', sprintf('M1 Scalar AMG   (GC=%.2f×)', gc_s));
+semilogy(1:L_rs, rs_dofs, '-^', 'Color', clr_rs, 'LineWidth', 1.8, ...
+    'MarkerSize', 7, 'MarkerFaceColor', clr_rs, ...
+    'DisplayName', sprintf('M2 Block AMG RS  (GC=%.2f×)', gc_rs));
+semilogy(1:L_b,  b_dofs,  '-s', 'Color', clr_b,  'LineWidth', 1.8, ...
     'MarkerSize', 7, 'MarkerFaceColor', clr_b, ...
-    'DisplayName', sprintf('Block AMG   (GC=%.2f×)', gc_b));
-annotate_pts(1:L_s, s_dofs, clr_s, 'above');
-annotate_pts(1:L_b, b_dofs, clr_b, 'below');
+    'DisplayName', sprintf('M3/M4 Block AMG  (GC=%.2f×)', gc_b));
+annotate_pts(1:L_s,  s_dofs,  clr_s,  'above');
+annotate_pts(1:L_rs, rs_dofs, clr_rs, 'below');
+annotate_pts(1:L_b,  b_dofs,  clr_b,  'above');
 set(gca, 'YScale', 'log');
 xlabel('Level');  ylabel('DOFs at level l');
 title('DOF count per hierarchy level', 'FontSize', 10);
